@@ -1,20 +1,51 @@
-import fetch from 'node-fetch';
+import fetch from "node-fetch";
 
 export default async function handler(req, res) {
   try {
-    const cg = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin%2Cpax-gold&vs_currencies=usd&include_24hr_change=true').then(r=>r.json());
+    // Fetch Bitcoin og PAXG frá CoinGecko
+    const cgRes = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,pax-gold&vs_currencies=usd&include_24hr_change=true"
+    );
+    const cgData = await cgRes.json();
+
+    // CoinGecko values
+    const bitcoin = {
+      price: cgData.bitcoin.usd,
+      change: cgData.bitcoin.usd_24h_change,
+    };
+
+    const paxg = {
+      price: cgData["pax-gold"].usd,
+      change: cgData["pax-gold"].usd_24h_change,
+    };
+
+    // Fetch Brent Oil frá Finnhub
     const finnhubKey = process.env.FINNHUB_API_KEY;
 
-    const oilData = await fetch(`https://finnhub.io/api/v1/quote?symbol=OANDA:BCO_USD&token=${finnhubKey}`).then(r=>r.json());
-    const spData = await fetch(`https://finnhub.io/api/v1/quote?symbol=^GSPC&token=${finnhubKey}`).then(r=>r.json());
+    const oilRes = await fetch(
+      `https://finnhub.io/api/v1/quote?symbol=OANDA:BCO_USD&token=${finnhubKey}`
+    );
+    const oilJson = await oilRes.json();
 
-    res.status(200).json({
-      bitcoin: { price: cg.bitcoin.usd, change: cg.bitcoin.usd_24h_change },
-      paxg: { price: cg["pax-gold"].usd, change: cg["pax-gold"].usd_24h_change },
-      oil: { price: oilData.c, change: ((oilData.c - oilData.pc) / oilData.pc) * 100 },
-      sp500: { price: spData.c, change: ((spData.c - spData.pc) / spData.pc) * 100 }
-    });
+    const oil = {
+      price: oilJson.c,
+      change: ((oilJson.c - oilJson.pc) / oilJson.pc) * 100,
+    };
+
+    // Fetch S&P 500 frá Finnhub
+    const spRes = await fetch(
+      `https://finnhub.io/api/v1/quote?symbol=^GSPC&token=${finnhubKey}`
+    );
+    const spJson = await spRes.json();
+
+    const sp500 = {
+      price: spJson.c,
+      change: ((spJson.c - spJson.pc) / spJson.pc) * 100,
+    };
+
+    res.status(200).json({ bitcoin, paxg, oil, sp500 });
   } catch (err) {
-    res.status(500).json({ error: "API error", details: err.message });
+    console.error("Villa í /api/prices:", err);
+    res.status(500).json({ error: "Villa við að sækja gögn" });
   }
 }
